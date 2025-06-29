@@ -1,10 +1,17 @@
 'use client';
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useAuth } from "@/contexts/AuthContext";
 
 export default function Header() {
   const { isAuthenticated, user, logout, isLoading } = useAuth();
+  const router = useRouter();
+
+  const handleSignOut = () => {
+    logout();
+    router.push('/');
+  };
 
   if (isLoading) {
     return (
@@ -25,7 +32,7 @@ export default function Header() {
               Welcome, {user?.name}
             </span>
             <button
-              onClick={logout}
+              onClick={handleSignOut}
               className="inline-flex items-center gap-2 px-4 py-2 bg-slate-700/50 hover:bg-slate-700 border border-slate-600 hover:border-slate-500 rounded-lg transition-all text-slate-300 hover:text-white"
             >
               <svg
