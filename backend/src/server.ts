@@ -8,7 +8,10 @@ import {
   MONGODB_URI,
   PORT,
 } from "./utils/config.ts";
-import { supportedCalculationMethods, supportedServices } from "./data/enums.ts";
+import {
+  supportedCalculationMethods,
+  supportedServices,
+} from "./data/enums.ts";
 import Masjid from "./models/masjid.ts";
 import User from "./models/user.ts";
 import { ObjectId as _ObjectId } from "mongoose";
@@ -32,17 +35,15 @@ app.get("/services", (_req: Request, res: Response) => {
 });
 
 app.post("/masjid", authenticateToken, async (req: Request, res: Response) => {
-  const { 
-    name, 
-    address, 
-    latitude, 
-    longitude, 
+  const {
+    name,
+    address,
+    latitude,
+    longitude,
     calculationMethod,
-    description,
     phone,
     email,
     services,
-    prayerTimes
   } = req.body;
 
   let lat = latitude;
@@ -78,44 +79,86 @@ app.post("/masjid", authenticateToken, async (req: Request, res: Response) => {
       lng = parseFloat(firstResult.lon);
     }
 
+    const today = new Date();
+    const dateString = `${today.getDate()}-${
+      today.getMonth() + 1
+    }-${today.getFullYear()}`;
+
+    let calculationIndex = supportedCalculationMethods.indexOf(
+      calculationMethod,
+    );
+    if (calculationIndex === -1) calculationIndex = 2; // default to ISNA
+    const url =
+      `https://api.aladhan.com/v1/timings/${dateString}?latitude=${lat}&longitude=${lng}&method=${calculationIndex}`;
+
+    let timings;
+    try {
+      const res = await fetch(url);
+      if (!res.ok) {
+        throw new Error(`Failed to fetch prayer times: ${res.statusText}`);
+      }
+
+      const data = await res.json();
+
+      timings = data.data.timings;
+    } catch (error) {
+      if (error instanceof Error) {
+        console.error("Error:", error.message);
+      } else {
+        console.error("Error:", error);
+      }
+    }
+
+    // Map timings keys to match schema (lowercase)
+    const mappedPrayerTimes = timings
+      ? {
+          fajr: timings.Fajr,
+          dhuhr: timings.Dhuhr,
+          asr: timings.Asr,
+          maghrib: timings.Maghrib,
+          isha: timings.Isha,
+        }
+      : {};
+
     const newMasjid = new Masjid({
       name,
       address,
       latitude: lat,
       longitude: lng,
       calculationMethod,
-      description,
       phone,
       email,
       services: services || [],
-      prayerTimes: prayerTimes || {}
+      prayerTimes: mappedPrayerTimes,
     });
 
     await newMasjid.save();
     console.log("✅ New masjid created:", name);
 
-    res.status(201).json({ 
+    res.status(201).json({
       success: true,
       message: "Masjid created successfully",
-      data: newMasjid
+      data: newMasjid,
     });
   } catch (error) {
     console.error("Error creating masjid:", error);
-    
+
     // Handle Mongoose validation errors
-    if (error instanceof Error && error.name === 'ValidationError') {
+    if (error instanceof Error && error.name === "ValidationError") {
       const validationError = error as mongoose.Error.ValidationError;
-      const errors = Object.values(validationError.errors).map((err) => err.message);
+      const errors = Object.values(validationError.errors).map((err) =>
+        err.message
+      );
       return res.status(400).json({
         success: false,
         error: "Validation failed",
-        details: errors
+        details: errors,
       });
     }
-    
-    res.status(500).json({ 
+
+    res.status(500).json({
       success: false,
-      error: "Internal server error" 
+      error: "Internal server error",
     });
   }
 });
@@ -150,6 +193,7 @@ app.get("/masjid/:id", async (req: Request, res: Response) => {
       });
     }
 
+    console.log(masjid)
     res.status(200).json({
       success: true,
       count: 1,
@@ -162,7 +206,7 @@ app.get("/masjid/:id", async (req: Request, res: Response) => {
       error: "Failed to fetch masajid data",
     });
   }
-})
+});
 
 // wrapper func for SHA-256 password hashing
 async function hashPassword(password: string): Promise<string> {
@@ -392,7 +436,7 @@ app.get(
 );
 
 app.post("/event", (_req: Request, res: Response) => {
-  res.status(402).json({err:"not implemeneted"})
+  res.status(402).json({ err: "not implemeneted" });
 });
 
 // Helper function to calculate distance using Haversine formula
@@ -472,92 +516,100 @@ app.post("/masjid/distances", (req: Request, res: Response) => {
 });
 
 // Update masjid route
-app.put("/masjid/:id", authenticateToken, async (req: Request, res: Response) => {
-  const { id } = req.params;
-  const { 
-    name, 
-    address, 
-    latitude, 
-    longitude, 
-    calculationMethod,
-    description,
-    phone,
-    email,
-    services,
-    prayerTimes
-  } = req.body;
+app.put(
+  "/masjid/:id",
+  authenticateToken,
+  async (req: Request, res: Response) => {
+    const { id } = req.params;
+    const {
+      name,
+      address,
+      latitude,
+      longitude,
+      calculationMethod,
+      description,
+      phone,
+      email,
+      services,
+      prayerTimes,
+    } = req.body;
 
-  try {
-    const updateData: Partial<{
-      name: string;
-      address: string;
-      latitude: number;
-      longitude: number;
-      calculationMethod: string;
-      description: string;
-      phone: string;
-      email: string;
-      services: string[];
-      prayerTimes: {
-        fajr?: string;
-        dhuhr?: string;
-        asr?: string;
-        maghrib?: string;
-        isha?: string;
-      };
-    }> = {};
-    
-    if (name !== undefined) updateData.name = name;
-    if (address !== undefined) updateData.address = address;
-    if (latitude !== undefined) updateData.latitude = latitude;
-    if (longitude !== undefined) updateData.longitude = longitude;
-    if (calculationMethod !== undefined) updateData.calculationMethod = calculationMethod;
-    if (description !== undefined) updateData.description = description;
-    if (phone !== undefined) updateData.phone = phone;
-    if (email !== undefined) updateData.email = email;
-    if (services !== undefined) updateData.services = services;
-    if (prayerTimes !== undefined) updateData.prayerTimes = prayerTimes;
+    try {
+      const updateData: Partial<{
+        name: string;
+        address: string;
+        latitude: number;
+        longitude: number;
+        calculationMethod: string;
+        description: string;
+        phone: string;
+        email: string;
+        services: string[];
+        prayerTimes: {
+          fajr?: string;
+          dhuhr?: string;
+          asr?: string;
+          maghrib?: string;
+          isha?: string;
+        };
+      }> = {};
 
-    const updatedMasjid = await Masjid.findByIdAndUpdate(
-      id,
-      updateData,
-      { new: true, runValidators: true }
-    );
+      if (name !== undefined) updateData.name = name;
+      if (address !== undefined) updateData.address = address;
+      if (latitude !== undefined) updateData.latitude = latitude;
+      if (longitude !== undefined) updateData.longitude = longitude;
+      if (calculationMethod !== undefined) {
+        updateData.calculationMethod = calculationMethod;
+      }
+      if (description !== undefined) updateData.description = description;
+      if (phone !== undefined) updateData.phone = phone;
+      if (email !== undefined) updateData.email = email;
+      if (services !== undefined) updateData.services = services;
+      if (prayerTimes !== undefined) updateData.prayerTimes = prayerTimes;
 
-    if (!updatedMasjid) {
-      return res.status(404).json({
+      const updatedMasjid = await Masjid.findByIdAndUpdate(
+        id,
+        updateData,
+        { new: true, runValidators: true },
+      );
+
+      if (!updatedMasjid) {
+        return res.status(404).json({
+          success: false,
+          error: "Masjid not found",
+        });
+      }
+
+      console.log("✅ Masjid updated:", updatedMasjid.name);
+
+      res.status(200).json({
+        success: true,
+        message: "Masjid updated successfully",
+        data: updatedMasjid,
+      });
+    } catch (error) {
+      console.error("Error updating masjid:", error);
+
+      // Handle Mongoose validation errors
+      if (error instanceof Error && error.name === "ValidationError") {
+        const validationError = error as mongoose.Error.ValidationError;
+        const errors = Object.values(validationError.errors).map((err) =>
+          err.message
+        );
+        return res.status(400).json({
+          success: false,
+          error: "Validation failed",
+          details: errors,
+        });
+      }
+
+      res.status(500).json({
         success: false,
-        error: "Masjid not found"
+        error: "Internal server error",
       });
     }
-
-    console.log("✅ Masjid updated:", updatedMasjid.name);
-
-    res.status(200).json({
-      success: true,
-      message: "Masjid updated successfully",
-      data: updatedMasjid
-    });
-  } catch (error) {
-    console.error("Error updating masjid:", error);
-    
-    // Handle Mongoose validation errors
-    if (error instanceof Error && error.name === 'ValidationError') {
-      const validationError = error as mongoose.Error.ValidationError;
-      const errors = Object.values(validationError.errors).map((err) => err.message);
-      return res.status(400).json({
-        success: false,
-        error: "Validation failed",
-        details: errors
-      });
-    }
-    
-    res.status(500).json({
-      success: false,
-      error: "Internal server error"
-    });
-  }
-});
+  },
+);
 
 mongoose.connect(MONGODB_URI).then(() => {
   console.log("Connected to Database");
