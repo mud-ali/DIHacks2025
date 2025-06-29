@@ -1,0 +1,17 @@
+{
+  "compilerOptions": {
+    "lib": ["deno.window"],
+    "strict": true
+  },
+  "imports": {
+    "express": "npm:express@^5.1.0",
+    "cors": "npm:cors@^2.8.5",
+    "mongoose": "npm:mongoose@^8.16.1",
+    "dotenv": "https://deno.land/std@0.208.0/dotenv/mod.ts",
+    "jsonwebtoken": "npm:jsonwebtoken@^9.0.2"
+  },
+  "tasks": {
+    "dev": "deno run --allow-net --allow-read --allow-env --allow-sys --watch src/server.ts",
+    "start": "deno run --allow-net --allow-read --allow-env --allow-sys src/server.ts"
+  }
+}
