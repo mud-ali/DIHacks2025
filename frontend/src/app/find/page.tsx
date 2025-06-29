@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from "react";
+import { useSearchParams } from "next/navigation";
 import axios from "axios";
 import Link from "next/link";
 import BackButton from "@/components/BackButton";
@@ -13,6 +14,7 @@ import { openInGoogleMaps } from "@/utils/maps";
 import type { Masjid } from "@/utils/masjid";
 
 export default function FindMasjid() {
+  const searchParams = useSearchParams();
   const [masajid, setMasajid] = useState<Masjid[]>([]);
   const [filteredMasajid, setFilteredMasajid] = useState<Masjid[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
@@ -26,6 +28,15 @@ export default function FindMasjid() {
   useEffect(() => {
     loadMasajid();
   }, []);
+
+  // Check for success messages from URL params
+  useEffect(() => {
+    if (searchParams.get('deleted') === 'true') {
+      setMessage(createSuccessMessage("Masjid deleted successfully"));
+      // Clear the URL parameter
+      window.history.replaceState({}, '', '/find');
+    }
+  }, [searchParams]);
 
   // Filter masajid based on search query
   useEffect(() => {

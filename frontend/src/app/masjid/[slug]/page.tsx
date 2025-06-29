@@ -4,10 +4,12 @@ import { useState, useEffect } from "react";
 import { useParams, useRouter } from "next/navigation";
 import BackButton from "@/components/BackButton";
 import Header from "@/components/Header";
+import { useAuth } from "@/contexts/AuthContext";
 import { getCurrentLocation, UserLocation } from "@/utils/geolocation";
 import { formatMasjidDistance } from "@/utils/masjid";
 import { fetchMasjidById, calculateMasajidDistances } from "@/utils/api";
 import { getMapSearchUrl, getMapDirectionsUrl } from "@/utils/maps";
+import api from "@/lib/api";
 
 interface MasjidDetails {
   id: number;
@@ -32,12 +34,15 @@ export default function MasjidPage() {
   const params = useParams();
   const router = useRouter();
   const slug = params.slug as string;
+  const { isAuthenticated, user } = useAuth();
 
   const [masjid, setMasjid] = useState<MasjidDetails | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [userLocation, setUserLocation] = useState<UserLocation | null>(null);
   const [distance, setDistance] = useState<number | null>(null);
+  const [isAdmin, setIsAdmin] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -49,29 +54,49 @@ export default function MasjidPage() {
   }, [slug]);
 
   useEffect(() => {
+    // Check if user is admin for this masjid
+    if (isAuthenticated && user && masjid) {
+      checkAdminStatus(masjid.id);
+    }
     // Try to get user location for distance calculation
     const getLocationForDistance = async () => {
       try {
         const location = await getCurrentLocation();
         setUserLocation(location);
-        
+
         // Calculate distance if we have both location and masjid data
         if (masjid && location) {
-          const masajidWithDistance = await calculateMasajidDistances(location, [masjid]);
+          const masajidWithDistance = await calculateMasajidDistances(
+            location,
+            [masjid],
+          );
           if (masajidWithDistance.length > 0) {
             setDistance(masajidWithDistance[0].distance || null);
           }
         }
       } catch (error) {
         // Silently fail - distance is optional
-        console.log("Could not get user location for distance calculation:", error);
+        console.log(
+          "Could not get user location for distance calculation:",
+          error,
+        );
       }
     };
 
     if (masjid) {
       getLocationForDistance();
     }
-  }, [masjid]);
+  }, [masjid, isAuthenticated, user]);
+
+  const checkAdminStatus = async (masjidId: number) => {
+    try {
+      const response = await api.get(`/api/masjid/${masjidId}/admin-check`);
+      setIsAdmin(response.data.isAdmin || false);
+    } catch (error) {
+      console.log("Error checking admin status:", error);
+      setIsAdmin(false);
+    }
+  };
 
   const fetchMasjidDetails = async (masjidId: string) => {
     setIsLoading(true);
@@ -80,10 +105,10 @@ export default function MasjidPage() {
     try {
       const data = await fetchMasjidById(masjidId);
       setMasjid(data.data[0]);
-      console.log(data, masjid)
+      console.log(data, masjid);
     } catch (error: unknown) {
       console.error("Error fetching masjid details:", error);
-      if (error && typeof error === 'object' && 'response' in error) {
+      if (error && typeof error === "object" && "response" in error) {
         const axiosError = error as { response?: { status?: number } };
         if (axiosError.response?.status === 404) {
           setError("Masjid not found");
@@ -112,13 +137,44 @@ export default function MasjidPage() {
 
   const getDirections = () => {
     if (masjid) {
-      const url = getMapDirectionsUrl({
-        latitude: masjid.latitude,
-        longitude: masjid.longitude,
-        address: masjid.address,
-        name: masjid.name,
-      }, userLocation || undefined);
+      const url = getMapDirectionsUrl(
+        {
+          latitude: masjid.latitude,
+          longitude: masjid.longitude,
+          address: masjid.address,
+          name: masjid.name,
+        },
+        userLocation || undefined,
+      );
       window.open(url, "_blank");
+    }
+  };
+
+  const handleEdit = () => {
+    if (masjid) {
+      router.push(`/masjid/${slug}/edit`);
+    }
+  };
+
+  const handleDelete = async () => {
+    if (
+      !masjid ||
+      !window.confirm(
+        "Are you sure you want to delete this masjid? This action cannot be undone.",
+      )
+    ) {
+      return;
+    }
+
+    setIsDeleting(true);
+    try {
+      await api.delete(`/api/masjid/${masjid.id}`);
+      router.push("/find?deleted=true");
+    } catch (error) {
+      console.error("Error deleting masjid:", error);
+      alert("Failed to delete masjid. Please try again.");
+    } finally {
+      setIsDeleting(false);
     }
   };
 
@@ -243,6 +299,56 @@ export default function MasjidPage() {
               </svg>
               Get Directions
             </button>
+
+            {/* Admin Controls */}
+            {isAdmin && (
+              <>
+                <button
+                  onClick={handleEdit}
+                  className="flex items-center gap-2 px-6 py-3 bg-amber-600/50 hover:bg-amber-600 border border-amber-500 rounded-lg transition-all text-amber-300 hover:text-white"
+                >
+                  <svg
+                    className="w-5 h-5"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"
+                    />
+                  </svg>
+                  Edit Masjid
+                </button>
+
+                <button
+                  onClick={handleDelete}
+                  disabled={isDeleting}
+                  className="flex items-center gap-2 px-6 py-3 bg-red-600/50 hover:bg-red-600 border border-red-500 rounded-lg transition-all text-red-300 hover:text-white disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {isDeleting ? (
+                    <div className="w-5 h-5 border-2 border-red-300/20 border-t-red-300 rounded-full animate-spin"></div>
+                  ) : (
+                    <svg
+                      className="w-5 h-5"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
+                      />
+                    </svg>
+                  )}
+                  {isDeleting ? "Deleting..." : "Delete Masjid"}
+                </button>
+              </>
+            )}
           </div>
 
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
@@ -270,8 +376,12 @@ export default function MasjidPage() {
 
                   {distance !== null && (
                     <div>
-                      <span className="text-slate-400 text-sm">Distance from you:</span>
-                      <p className="text-white">{formatMasjidDistance(distance)}</p>
+                      <span className="text-slate-400 text-sm">
+                        Distance from you:
+                      </span>
+                      <p className="text-white">
+                        {formatMasjidDistance(distance)}
+                      </p>
                     </div>
                   )}
                 </div>
@@ -382,6 +492,39 @@ export default function MasjidPage() {
               )}
             </div>
           </div>
+
+          {/* Admin Actions */}
+          {isAdmin && (
+            <div className="mt-8">
+              <h2 className="text-xl font-semibold text-emerald-400 mb-4">
+                Admin Actions
+              </h2>
+
+              <div className="flex gap-4">
+                <button
+                  onClick={handleEdit}
+                  className="flex-1 px-6 py-3 bg-blue-600/50 hover:bg-blue-600 border border-blue-500 rounded-lg transition-all text-blue-300 hover:text-white"
+                >
+                  Edit Masjid
+                </button>
+
+                <button
+                  onClick={handleDelete}
+                  className="flex-1 px-6 py-3 bg-red-600/50 hover:bg-red-600 border border-red-500 rounded-lg transition-all text-red-300 hover:text-white"
+                  disabled={isDeleting}
+                >
+                  {isDeleting ? (
+                    <div className="flex items-center justify-center gap-2">
+                      <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                      Deleting...
+                    </div>
+                  ) : (
+                    "Delete Masjid"
+                  )}
+                </button>
+              </div>
+            </div>
+          )}
         </div>
       </div>
     </div>

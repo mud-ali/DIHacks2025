@@ -45,6 +45,7 @@ app.post("/masjid", authenticateToken, async (req: Request, res: Response) => {
     email,
     services,
   } = req.body;
+  const authenticatedReq = req as AuthenticatedRequest;
 
   let lat = latitude;
   let lng = longitude;
@@ -134,6 +135,17 @@ app.post("/masjid", authenticateToken, async (req: Request, res: Response) => {
 
     await newMasjid.save();
     console.log("✅ New masjid created:", name);
+
+    // Make the creator an admin of this masjid
+    const userId = authenticatedReq.user?.userId;
+    if (userId) {
+      await User.findByIdAndUpdate(
+        userId,
+        { $addToSet: { admin: newMasjid._id } },
+        { new: true }
+      );
+      console.log("👑 User", authenticatedReq.user?.email, "is now admin of", name);
+    }
 
     res.status(201).json({
       success: true,
@@ -521,6 +533,7 @@ app.put(
   authenticateToken,
   async (req: Request, res: Response) => {
     const { id } = req.params;
+    const authenticatedReq = req as AuthenticatedRequest;
     const {
       name,
       address,
@@ -535,6 +548,24 @@ app.put(
     } = req.body;
 
     try {
+      // Check if masjid exists
+      const existingMasjid = await Masjid.findById(id);
+      if (!existingMasjid) {
+        return res.status(404).json({
+          success: false,
+          error: "Masjid not found"
+        });
+      }
+
+      // Check if user is admin of this specific masjid
+      const userId = authenticatedReq.user?.userId;
+      if (!userId || !(await isUserAdminOfMasjid(userId, id))) {
+        return res.status(403).json({
+          success: false,
+          error: "You are not authorized to modify this masjid"
+        });
+      }
+
       const updateData: Partial<{
         name: string;
         address: string;
@@ -573,14 +604,7 @@ app.put(
         { new: true, runValidators: true },
       );
 
-      if (!updatedMasjid) {
-        return res.status(404).json({
-          success: false,
-          error: "Masjid not found",
-        });
-      }
-
-      console.log("✅ Masjid updated:", updatedMasjid.name);
+      console.log("✅ Masjid updated:", updatedMasjid?.name);
 
       res.status(200).json({
         success: true,
@@ -611,6 +635,78 @@ app.put(
   },
 );
 
+app.get("/masjid/:id/admin-check", authenticateToken, async (req: Request, res: Response) => {
+  const { id } = req.params;
+  const authenticatedReq = req as AuthenticatedRequest;
+
+  try {
+    const userId = authenticatedReq.user?.userId;
+    const isAdmin = userId ? await isUserAdminOfMasjid(userId, id) : false;
+    
+    res.status(200).json({
+      success: true,
+      isAdmin,
+    });
+  } catch (error) {
+    console.error("Error checking admin status:", error);
+    res.status(500).json({
+      success: false,
+      error: "Internal server error",
+    });
+  }
+});
+
+// Delete masjid route
+app.delete("/masjid/:id", authenticateToken, async (req: Request, res: Response) => {
+  const { id } = req.params;
+  const authenticatedReq = req as AuthenticatedRequest;
+
+  try {
+    // Find the masjid first to check if it exists
+    const masjid = await Masjid.findById(id);
+    if (!masjid) {
+      return res.status(404).json({
+        success: false,
+        error: "Masjid not found"
+      });
+    }
+
+    // Check if user is admin of this specific masjid
+    const userId = authenticatedReq.user?.userId;
+    if (!userId || !(await isUserAdminOfMasjid(userId, id))) {
+      return res.status(403).json({
+        success: false,
+        error: "You are not authorized to delete this masjid"
+      });
+    }
+
+    // Delete the masjid
+    await Masjid.findByIdAndDelete(id);
+    console.log("🗑️ Masjid deleted:", masjid.name);
+
+    // Remove the masjid from all users' admin arrays
+    await User.updateMany(
+      { admin: id },
+      { $pull: { admin: id } }
+    );
+
+    res.status(200).json({
+      success: true,
+      message: "Masjid deleted successfully",
+      data: {
+        id: id,
+        name: masjid.name
+      }
+    });
+  } catch (error) {
+    console.error("Error deleting masjid:", error);
+    res.status(500).json({
+      success: false,
+      error: "Internal server error"
+    });
+  }
+});
+
 mongoose.connect(MONGODB_URI).then(() => {
   console.log("Connected to Database");
   app.listen(
@@ -620,5 +716,17 @@ mongoose.connect(MONGODB_URI).then(() => {
 }).catch((e: Error) => {
   console.error("Error connecting to the DB: ", e.message);
 });
+
+// Helper function to check if user is admin of a specific masjid
+async function isUserAdminOfMasjid(userId: string, masjidId: string): Promise<boolean> {
+  try {
+    const user = await User.findById(userId);
+    const userAdminMasajid = user?.admin.map((objId: mongoose.Types.ObjectId) => objId.toString()) || [];
+    return userAdminMasajid.includes(masjidId);
+  } catch (error) {
+    console.error("Error checking admin status:", error);
+    return false;
+  }
+}
 
 export default app;
