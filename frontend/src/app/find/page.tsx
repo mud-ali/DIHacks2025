@@ -127,7 +127,7 @@ export default function FindMasjid() {
       <div className="max-w-6xl mx-auto">
         <div className="bg-slate-800/50 backdrop-blur-sm rounded-2xl p-8 shadow-2xl border border-slate-700/50">
           <h1 className="text-3xl font-bold text-center mb-2 bg-gradient-to-r from-emerald-400 to-teal-400 bg-clip-text text-transparent">
-            Find Masajid
+            Find Center
           </h1>
           <p className="text-slate-300 text-center mb-8">
             Search for masajid in your area
