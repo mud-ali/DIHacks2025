@@ -3,6 +3,8 @@ import Link from "next/link";
 import Header from "@/components/Header";
 import darulIslah from "@/assets/darulislah.jpg";
 import minhaj from "@/assets/minhaj.jpg";
+import nidaUlIslam from "@/assets/nidaulislam.png"
+import masjidAlWali from "@/assets/wali.jpg"
 
 export default function Home() {
   return (
@@ -13,10 +15,10 @@ export default function Home() {
       <div className="max-w-6xl mx-auto px-6 py-20">
         <div className="text-center mb-16">
           <h1 className="text-5xl md:text-6xl font-bold mb-8 bg-gradient-to-r from-emerald-400 to-teal-400 bg-clip-text text-transparent">
-            Masjid.Online
+            Muslim.Online
           </h1>
           <p className="text-xl text-slate-300 max-w-2xl mx-auto leading-relaxed">
-            Connect with your local mosque community. Find prayer times, events, and stay updated with everything happening at your masjid.
+            Discover your local masjid community. Find prayer times, events, and stay updated with everything happening at your masjid.
           </p>
         </div>
 
@@ -52,7 +54,7 @@ export default function Home() {
               <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent"></div>
               <div className="absolute bottom-4 left-4">
                 <h3 className="text-white font-semibold text-lg">Darul Islah</h3>
-                <p className="text-slate-300 text-sm">Community Mosque</p>
+                <p className="text-slate-300 text-sm">Muslim Center of Bergen County</p>
               </div>
             </div>
             
@@ -65,33 +67,33 @@ export default function Home() {
               <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent"></div>
               <div className="absolute bottom-4 left-4">
                 <h3 className="text-white font-semibold text-lg">Minhaj Ul Quran</h3>
-                <p className="text-slate-300 text-sm">Islamic Center</p>
+                <p className="text-slate-300 text-sm">Hackensack, NJ</p>
               </div>
             </div>
             
             <div className="relative group overflow-hidden rounded-xl">
               <Image
-                src={minhaj}
+                src={nidaUlIslam}
+                alt="Teaneck Mosque"
+                className="w-full h-64 object-cover transition-transform duration-300 group-hover:scale-110"
+              />
+              <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent"></div>
+              <div className="absolute bottom-4 left-4">
+                <h3 className="text-white font-semibold text-lg">Nida Ul Islam</h3>
+                <p className="text-slate-300 text-sm">Teaneck, NJ</p>
+              </div>
+            </div>
+
+            <div className="relative group overflow-hidden rounded-xl">
+              <Image
+                src={masjidAlWali}
                 alt="Minhaj Mosque Branch"
                 className="w-full h-64 object-cover transition-transform duration-300 group-hover:scale-110"
               />
               <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent"></div>
               <div className="absolute bottom-4 left-4">
-                <h3 className="text-white font-semibold text-lg">Minhaj Ul Quran</h3>
-                <p className="text-slate-300 text-sm">Local Community</p>
-              </div>
-            </div>
-            
-            <div className="relative group overflow-hidden rounded-xl">
-              <Image
-                src={darulIslah}
-                alt="Darul Islah Branch"
-                className="w-full h-64 object-cover transition-transform duration-300 group-hover:scale-110"
-              />
-              <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent"></div>
-              <div className="absolute bottom-4 left-4">
-                <h3 className="text-white font-semibold text-lg">Darul Islah Branch</h3>
-                <p className="text-slate-300 text-sm">Neighborhood Mosque</p>
+                <h3 className="text-white font-semibold text-lg">Masjid Al-Wali</h3>
+                <p className="text-slate-300 text-sm">Edison, NJ</p>
               </div>
             </div>
           </div>
